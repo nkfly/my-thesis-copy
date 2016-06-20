@@ -42,7 +42,7 @@ public interface IDPlacementStrategy {
     
     public void globalMaxProbGetPartitions(Map<InternalVertex, PartitionAssignment> vertices, int partitionID);
     public void connectedComponentMaxProbGetPartitions(Map<InternalVertex, PartitionAssignment> vertices, List <Set <InternalVertex> > connectedComponents, List <Map <Long, Integer> > connectedComponents2partitionCount);
-    public void independentCascadingGetPartitions(Map<InternalVertex, PartitionAssignment> vertices, int partitionID);
+    public void independentCascadingGetPartitions(Map<InternalVertex, PartitionAssignment> vertices);
 
     /**
      * After construction, the {@link com.thinkaurelius.titan.graphdb.idmanagement.IDManager} used by this graph instance

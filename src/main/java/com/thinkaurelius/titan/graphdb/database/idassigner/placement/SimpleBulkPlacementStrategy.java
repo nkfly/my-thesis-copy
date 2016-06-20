@@ -125,18 +125,21 @@ public class SimpleBulkPlacementStrategy implements IDPlacementStrategy {
     		for (InternalVertex vetex : connectedComponent) {
     			if (vertices.containsKey(vetex)) {
     				vertices.replace(vetex, new SimplePartitionAssignment(connectedComponentMaxProbPartitionIds.get(index)));
+    				System.out.println("connectedComponentMaxProbGetPartitions" + connectedComponentMaxProbPartitionIds.get(index));
     			}
     		}
     		index++;
     	}
     }
     
-    public void independentCascadingGetPartitions(Map<InternalVertex, PartitionAssignment> vertices, int partitionID) {
-    	if (partitionID == -1) {
-    		partitionID = nextPartitionID();
-    	}
+    public void independentCascadingGetPartitions(Map<InternalVertex, PartitionAssignment> vertices) {
+//    	if (partitionID == -1) {
+//    		partitionID = nextPartitionID();
+//    	}
         for (Map.Entry<InternalVertex, PartitionAssignment> entry : vertices.entrySet()) {
-            entry.setValue(new SimplePartitionAssignment(partitionID));
+        	if (entry.getValue().equals(PartitionAssignment.EMPTY)) {
+        		entry.setValue(new SimplePartitionAssignment(nextPartitionID()));
+        	}
         }
     }
     

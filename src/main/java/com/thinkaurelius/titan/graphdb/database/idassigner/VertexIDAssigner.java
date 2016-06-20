@@ -5,13 +5,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.thinkaurelius.titan.core.*;
-import com.thinkaurelius.titan.core.Cardinality;
 import com.thinkaurelius.titan.graphdb.configuration.PreInitializeConfigOptions;
 import com.thinkaurelius.titan.graphdb.internal.InternalRelationType;
 import com.thinkaurelius.titan.graphdb.relations.EdgeDirection;
 import com.thinkaurelius.titan.graphdb.relations.ReassignableRelation;
 import com.thinkaurelius.titan.util.stats.NumberUtil;
-
 import com.thinkaurelius.titan.diskstorage.Backend;
 import com.thinkaurelius.titan.diskstorage.IDAuthority;
 import com.thinkaurelius.titan.diskstorage.configuration.ConfigOption;
@@ -357,8 +355,8 @@ public class VertexIDAssigner implements AutoCloseable {
 //    }
     
     public void assignIDs(Iterable<InternalRelation> addedRelations) {
-//    	System.out.println("assignIDs(Iterable<InternalRelation> addedRelations)");
-//    	System.out.println("global max-probability bulk placement");
+    	System.out.println("assignIDs(Iterable<InternalRelation> addedRelations)");
+    	System.out.println("global max-probability bulk placement");
         if (!placementStrategy.supportsBulkPlacement()) {
             for (InternalRelation relation : addedRelations) {
                 for (int i = 0; i < relation.getArity(); i++) {
@@ -383,11 +381,13 @@ public class VertexIDAssigner implements AutoCloseable {
                         else
                             assignments.put(vertex, PartitionAssignment.EMPTY);
                     } else {
-                    	long partitionId = idManager.getPartitionId(vertex.longId());
-                    	if (partitionToCount.get(partitionId) == null) {
-                    		partitionToCount.put(partitionId, 1);
-                    	} else {
-                    		partitionToCount.put(partitionId, partitionToCount.get(partitionId) + 1);                    		
+                    	long partitionId = getPartitionID(vertex);
+                    	if (partitionId != 0) {
+                    		if (partitionToCount.get(partitionId) == null) {
+                        		partitionToCount.put(partitionId, 1);
+                        	} else {
+                        		partitionToCount.put(partitionId, partitionToCount.get(partitionId) + 1);                    		
+                        	}
                     	}
                     }
                 }
@@ -453,18 +453,21 @@ public class VertexIDAssigner implements AutoCloseable {
 //            List <Set <InternalVertex> > connectedComponents = new ArrayList<Set<InternalVertex>>();
 //            List <Map <Long, Integer> > connectedComponents2partitionCount = new ArrayList<Map <Long, Integer> >();
 //            for (InternalRelation relation : addedRelations) {
-//            	int connectedComponentId = -1;
+//            	int connectedComponentId1 = -1;
+//            	int connectedComponentId2 = -1;
 //            	Set <InternalVertex> connectedComponent = new HashSet<InternalVertex>();
 //            	Map <Long, Integer> partitionToCount = new HashMap<Long, Integer>();
 //                for (int i = 0; i < relation.getArity(); i++) {
 //                	InternalVertex vertex = relation.getVertex(i).it();
 //                	if (vertex.hasId()) {
-//                		long partitionId = idManager.getPartitionId(vertex.longId());
-//                    	if (partitionToCount.get(partitionId) == null) {
-//                    		partitionToCount.put(partitionId, 1);
-//                    	} else {
-//                    		partitionToCount.put(partitionId, partitionToCount.get(partitionId) + 1);       
-//                    	}
+//                		long partitionId = getPartitionID(vertex);
+//                		if (partitionId != 0) {
+//                			if (partitionToCount.get(partitionId) == null) {
+//                        		partitionToCount.put(partitionId, 1);
+//                        	} else {
+//                        		partitionToCount.put(partitionId, partitionToCount.get(partitionId) + 1);       
+//                        	}
+//                		}
 //                	} else {
 //                		assert !(vertex instanceof TitanSchemaVertex); //Those are assigned ids immediately in the transaction
 //                        if (vertex.vertexLabel().isPartitioned())
@@ -475,35 +478,81 @@ public class VertexIDAssigner implements AutoCloseable {
 //                	
 //                	connectedComponent.add(vertex);
 //                	for (int j = 0; j < connectedComponents.size(); j++) {
-//                		if (connectedComponents.get(j).contains(vertex)) {
-//                			connectedComponentId = j;
+//                		if (connectedComponents.get(j).contains(vertex) && connectedComponentId1 == -1) {
+//                			connectedComponentId1 = j;
+//                		} else if (connectedComponents.get(j).contains(vertex) && connectedComponentId2 == -1) {
+//                			connectedComponentId2 = j;
+//                			
 //                		}
 //                	}
 //                }
 //                
-//                if (connectedComponentId == -1) {
+//                if (connectedComponentId1 == -1) {
 //                	// need to add a new connected component
 //                	connectedComponents.add(connectedComponent);
 //                	connectedComponents2partitionCount.add(partitionToCount);
-//                } else {
+//                } else if (connectedComponentId1 != -1 && connectedComponentId2 == -1){
 //                	for (InternalVertex vertex : connectedComponent) {
-//                		connectedComponents.get(connectedComponentId).add(vertex);
+//                		connectedComponents.get(connectedComponentId1).add(vertex);
 //                	}
 //                	
 //                	for (Long partitionId : partitionToCount.keySet()) {
-//                		Integer count = connectedComponents2partitionCount.get(connectedComponentId).get(partitionId);
+//                		Integer count = connectedComponents2partitionCount.get(connectedComponentId1).get(partitionId);
 //                		if (count == null) {
-//                			connectedComponents2partitionCount.get(connectedComponentId).put(partitionId, partitionToCount.get(partitionId));
+//                			connectedComponents2partitionCount.get(connectedComponentId1).put(partitionId, partitionToCount.get(partitionId));
 //                		} else {
-//                			connectedComponents2partitionCount.get(connectedComponentId).put(partitionId, count + partitionToCount.get(partitionId));
+//                			connectedComponents2partitionCount.get(connectedComponentId1).put(partitionId, count + partitionToCount.get(partitionId));
 //                		}
 //                	}
+//                } else if (connectedComponentId1 != -1 && connectedComponentId2 != -1) {
+//                    
+//                    Set <InternalVertex> connectedComponent1 = connectedComponents.get(connectedComponentId1);
+//                    Set <InternalVertex> connectedComponent2 = connectedComponents.get(connectedComponentId2);
+//                    
+//                    Set<InternalVertex> mergeConnectedComponent = new HashSet<InternalVertex>();
+//                    mergeConnectedComponent.addAll(connectedComponent1);
+//                    mergeConnectedComponent.addAll(connectedComponent2);
+//                    
+//                    Map <Long, Integer> partitionCount1 = connectedComponents2partitionCount.get(connectedComponentId1);
+//                    Map <Long, Integer> partitionCount2 = connectedComponents2partitionCount.get(connectedComponentId2);
+//                    
+//                    Map <Long, Integer> mergePartitionCount = new HashMap<Long, Integer>();
+//                    for (Long partitinoCount : partitionCount1.keySet()) {
+//                    	mergePartitionCount.put(partitinoCount, partitionCount1.get(partitinoCount));
+//                    }
+//                    
+//                    for (Long partitinoCount : partitionCount2.keySet()) {
+//                    	if (mergePartitionCount.get(partitinoCount) == null) {
+//                    		mergePartitionCount.put(partitinoCount, partitionCount2.get(partitinoCount));                    		
+//                    	} else {
+//                    		mergePartitionCount.put(partitinoCount, mergePartitionCount.get(partitinoCount) + partitionCount2.get(partitinoCount));
+//                    	}
+//                    }
+//                    
+//                    List <Set <InternalVertex> > tempConnectedComponents = new ArrayList<Set<InternalVertex>>();
+//                    List <Map <Long, Integer> > tempConnectedComponents2partitionCount = new ArrayList<Map <Long, Integer> >();
+//                    
+////                    List <Set <InternalVertex> > connectedComponents = new ArrayList<Set<InternalVertex>>();
+////                    List <Map <Long, Integer> > connectedComponents2partitionCount = new ArrayList<Map <Long, Integer> >();
+//                    
+//                    tempConnectedComponents.add(mergeConnectedComponent);
+//                    tempConnectedComponents2partitionCount.add(mergePartitionCount);
+//                    
+//                    for (int i = 0; i < connectedComponents.size(); i++) {
+//                    	if (i == connectedComponentId1 || i == connectedComponentId2) {
+//                    		continue;
+//                    	}
+//                    	tempConnectedComponents.add(connectedComponents.get(i));
+//                    	tempConnectedComponents2partitionCount.add(connectedComponents2partitionCount.get(i));
+//                    }
+//                    
+//                    connectedComponents = tempConnectedComponents;
+//                    connectedComponents2partitionCount = tempConnectedComponents2partitionCount;
 //                }
 //            }
 //            log.trace("Bulk id assignment for {} vertices", assignments.size());
 //            
 //            for (int attempt = 0; attempt < MAX_PARTITION_RENEW_ATTEMPTS && (assignments != null && !assignments.isEmpty()); attempt++) {
-//            	
 //                placementStrategy.connectedComponentMaxProbGetPartitions(assignments, connectedComponents, connectedComponents2partitionCount);
 //                Map<InternalVertex, PartitionAssignment> leftOvers = null;
 //                Iterator<Map.Entry<InternalVertex, PartitionAssignment>> iter = assignments.entrySet().iterator();
@@ -531,6 +580,107 @@ public class VertexIDAssigner implements AutoCloseable {
 //                assignID(relation);
 //            }
 //        }
+//    }
+    
+//    public void assignIDs(Iterable<InternalRelation> addedRelations) {
+//    	System.out.println("assignIDs(Iterable<InternalRelation> addedRelations)");
+//    	System.out.println("ic bulk placement");
+//    	
+//    	if (!placementStrategy.supportsBulkPlacement()) {
+//          for (InternalRelation relation : addedRelations) {
+//              for (int i = 0; i < relation.getArity(); i++) {
+//                  InternalVertex vertex = relation.getVertex(i);
+//                  if (!vertex.hasId()) {
+//                      assignID(vertex, getVertexIDType(vertex));
+//                  }
+//              }
+//              assignID(relation);
+//          }
+//      } else {
+//          //2) only assign ids to (user) vertices
+//          Map<InternalVertex, PartitionAssignment> assignments = new HashMap<InternalVertex, PartitionAssignment>();
+//          Map <InternalVertex, Long> activatedSet = new HashMap<InternalVertex, Long>();
+//          
+//          Map<InternalVertex, Set<InternalVertex>> adjacencyList = new HashMap<InternalVertex, Set<InternalVertex> >();
+//          for (InternalRelation relation : addedRelations) {
+//              for (int i = 0; i < relation.getArity(); i++) {
+//                  InternalVertex vertex = relation.getVertex(i);
+//                  
+//                  if (!vertex.hasId()) {
+//                      assert !(vertex instanceof TitanSchemaVertex); //Those are assigned ids immediately in the transaction
+//                      if (vertex.vertexLabel().isPartitioned())
+//                          assignID(vertex, getVertexIDType(vertex)); //Assign partitioned vertex ids immediately
+//                      else
+//                          assignments.put(vertex, PartitionAssignment.EMPTY);
+//                  } else {
+//                	  if (vertex instanceof TitanVertex && relation.getArity() == 2)activatedSet.put(vertex, idManager.getPartitionId(vertex.longId()));
+//                  }
+////                  System.out.println("relation.getArity() " + relation.getArity());
+//                  for (int j = 0; j < relation.getArity(); j++) {
+//                	  if (i == j) {
+//                		  continue;
+//                	  }
+//                	  
+//                	  if (adjacencyList.get(vertex) == null) {
+//                		  adjacencyList.put(vertex, new HashSet<InternalVertex>());
+//                	  }
+//                	  
+//                	  InternalVertex anotherVertex = relation.getVertex(j);
+//                	  adjacencyList.get(vertex).add(anotherVertex);
+//                  }
+//              }
+//          }
+//          log.trace("Bulk id assignment for {} vertices", assignments.size());
+//          while (activatedSet.size() > 0) {
+//        	  Map <InternalVertex, Long> tempActivatedSet = new HashMap<InternalVertex, Long>();
+//        	  
+//        	  for (InternalVertex vertex : activatedSet.keySet()) {
+//        		  Set<InternalVertex> connectedNodes = adjacencyList.get(vertex);
+//        		  if (connectedNodes == null || connectedNodes.size() > 10) {
+//        			  continue;
+//        		  }
+//        		  for (InternalVertex connectedNode : connectedNodes) {
+//        			  if (!connectedNode.hasId()) {
+//        				  if (assignments.containsKey(connectedNode) && assignments.get(connectedNode).equals(PartitionAssignment.EMPTY)) {
+//        					  int partitionID = (new Long(activatedSet.get(vertex))).intValue();
+//        					  assignments.put(connectedNode, new SimplePartitionAssignment(partitionID));
+//        					  tempActivatedSet.put(connectedNode, (long)partitionID);
+//        				  }
+//        			  }
+//        		  }
+//        	  }
+//        	  
+//        	  activatedSet = tempActivatedSet;
+//        	  }
+//        	  
+//          for (int attempt = 0; attempt < MAX_PARTITION_RENEW_ATTEMPTS && (assignments != null && !assignments.isEmpty()); attempt++) {
+//              placementStrategy.independentCascadingGetPartitions(assignments);
+//              Map<InternalVertex, PartitionAssignment> leftOvers = null;
+//              Iterator<Map.Entry<InternalVertex, PartitionAssignment>> iter = assignments.entrySet().iterator();
+//              while (iter.hasNext()) {
+//                  Map.Entry<InternalVertex, PartitionAssignment> entry = iter.next();
+//                  try {
+//                      assignID(entry.getKey(), entry.getValue().getPartitionID(), getVertexIDType(entry.getKey()));
+//                      Preconditions.checkArgument(entry.getKey().hasId());
+//                  } catch (IDPoolExhaustedException e) {
+//                      if (leftOvers == null) leftOvers = new HashMap<InternalVertex, PartitionAssignment>();
+//                      leftOvers.put(entry.getKey(), PartitionAssignment.EMPTY);
+//                      break;
+//                  }
+//              }
+//              if (leftOvers != null) {
+//                  while (iter.hasNext()) leftOvers.put(iter.next().getKey(), PartitionAssignment.EMPTY);
+//                  log.debug("Exhausted ID Pool in bulk assignment. Left-over vertices {}", leftOvers.size());
+//              }
+//              assignments = leftOvers;
+//          }
+//          if (assignments != null && !assignments.isEmpty())
+//              throw new IDPoolExhaustedException("Could not find non-exhausted partition ID Pool after " + MAX_PARTITION_RENEW_ATTEMPTS + " attempts");
+//          //3) assign ids to relations
+//          for (InternalRelation relation : addedRelations) {
+//              assignID(relation);
+//          }
+//      }
 //    }
 
 

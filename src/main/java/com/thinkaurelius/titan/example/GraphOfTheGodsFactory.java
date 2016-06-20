@@ -99,7 +99,8 @@ public static void load(final TitanGraph graph, String mixedIndexName, boolean u
         try {
         	Map <Long, TitanVertex> catchNodeSet = new HashMap<Long, TitanVertex>();
 //        	Map <String, TitanVertex> transactionNodeSet = new HashMap<String, TitanVertex>();
-        	File graphFile = new File("/home/nkfly/soc-pokec-relationships.txt.out");
+        	File graphFile = new File("/home/nkfly/facebook_combined.txt.out");
+        	System.out.println(graphFile.getName());
             BufferedReader reader = new BufferedReader(new FileReader(graphFile));
             int relationsPerTransaction = 100;
             int count = 0;
@@ -110,10 +111,6 @@ public static void load(final TitanGraph graph, String mixedIndexName, boolean u
             	
             	if (allCount % 10000 == 0) {
             		System.out.println(allCount);
-            	}
-            	
-            	if (allCount >= 20000000) {
-            		break;
             	}
             	
             	if (count > relationsPerTransaction) {
@@ -127,7 +124,7 @@ public static void load(final TitanGraph graph, String mixedIndexName, boolean u
 //            		transactionNodeSet = new HashMap<String, TitanVertex>();
             		count = 0;
             		
-            		if (catchNodeSet.size() > 300000) {
+            		if (catchNodeSet.size() > 500000) {
             			catchNodeSet = new HashMap<Long, TitanVertex>();
             		}
             	}
